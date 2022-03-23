@@ -1,0 +1,185 @@
+<template>
+  <div class="mine">
+    <h3 v-show="!ifShowDetail">作业记录</h3>
+    <div v-show="!ifShowDetail">
+      <div class="check-group">
+        <span>显示列：</span>
+        <el-checkbox
+          v-for="col in Columns"
+          v-model="col.ifShow"
+          :key="col.value"
+          size="small"
+          style="margin-right:10px"
+          >{{ col.name }}</el-checkbox
+        >
+      </div>
+      <el-table
+        :data="tableData"
+        border
+        style="width: 100%"
+        :default-sort="{ prop: 'date', order: 'descending' }"
+      >
+        <template v-for="col in Columns">
+          <el-table-column
+            align="center"
+            v-if="col.ifShow"
+            :prop="col.value"
+            :width="col.width"
+            :label="col.name"
+            sortable
+            :key="col.value"
+          >
+            <template slot-scope="scope">
+              <i
+                class="el-icon-success"
+                style="color:#67C23A;margin-right:4px"
+                v-if="scope.row[col.value] == '已审核'"
+              ></i>
+              <i
+                class="el-icon-question"
+                style="color:#E6A23C;margin-right:4px"
+                v-if="scope.row[col.value] == '未审核'"
+              ></i>
+              <i
+                class="el-icon-warning"
+                style="color:#F56C6C;margin-right:4px"
+                v-if="scope.row[col.value] == '未通过'"
+              ></i>
+              <span>{{ scope.row[col.value] }}</span>
+            </template>
+          </el-table-column>
+        </template>
+        <el-table-column label="操作" width="80" fixed="right" align="center">
+          <template slot-scope="scope">
+            <el-button size="mini" @click="handleShow(scope.$index, scope.row)"
+              >查看</el-button
+            >
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination
+        class="pagination"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+        :current-page="currentPage"
+        :page-sizes="[10, 20, 30, 40, 50, 100]"
+        :page-size="pageSize"
+        :layout="paginationLayout"
+        :small="ifSmall"
+        :total="dataCount"
+      >
+      </el-pagination>
+    </div>
+    <template v-if="roleId === 3"
+      ><StuDetail
+        :detailData="detailData"
+        :goback="goBack"
+        v-show="ifShowDetail"
+      >
+      </StuDetail
+    ></template>
+  </div>
+</template>
+
+<script>
+import { getMyWorkList, getStuDetail } from "../api";
+import StuDetail from "../components/StuDetail.vue";
+import { mapGetters } from "vuex";
+export default {
+  name: "Mine",
+  components: { StuDetail },
+  computed: {
+    ...mapGetters(["roleId"]),
+  },
+  data() {
+    return {
+      ifSmall: false,
+      paginationLayout: "prev, pager,next, jumper, ->, total, sizes",
+      ifShowDetail: false,
+      detailData: {},
+      currentPage: 1,
+      pageSize: 10,
+      tableData: [{}],
+      // 数据列
+      Columns: [
+        { name: "审核状态", value: "reviewName", width: "180", ifShow: true },
+        { name: "作业名称", value: "WorkName", width: "180", ifShow: true },
+        { name: "作业题目", value: "WorkPlace", width: "auto", ifShow: true },
+        { name: "提交时间", value: "createAt", width: "280", ifShow: true },
+        { name: "作业截止时间", value: "DeadLine", width: "280", ifShow: true },
+      ],
+      dataCount: 0, //总数据条数
+    };
+  },
+  mounted() {
+    this.getTableData(10, 1);
+    if (document.documentElement.clientWidth < 720) {
+      //closeDebug console.log("触发移动端布局");
+      this.paginationLayout = "prev, pager, next,  ->, total";
+      this.ifSmall = true;
+      this.Columns = [
+        { name: "状态", value: "reviewName", width: "85", ifShow: true },
+        { name: "作业题目", value: "WorkPlace", width: "auto", ifShow: true },
+        { name: "提交时间", value: "createAt", width: "auto", ifShow: false },
+      ];
+    }
+  },
+  methods: {
+    //调用接口取数据
+    getTableData(limit, page) {
+      //参数绑定「分页大小、页码」
+      let params = new URLSearchParams();
+      params.append("limit", limit);
+      params.append("page", page);
+      getMyWorkList(params)
+        .then((res) => {
+          //closeDebug console.log("-----------获取表格数据---------------");
+          //closeDebug console.log(res.data);
+          (this.tableData = res.data), (this.dataCount = res.count);
+        })
+        .catch((failResponse) => {});
+    },
+    //数据格式化
+    formatter(row, column) {
+      return row.address;
+    },
+    handleSizeChange(val) {
+      this.pageSize = val;
+      //closeDebug console.log(`每页 ${val} 条`);
+      this.getTableData(val, 1);
+    },
+    handleCurrentChange(val) {
+      //closeDebug console.log(`当前页: ${val}`);
+      this.getTableData(this.pageSize, val);
+    },
+    handleShow(index, row) {
+      //closeDebug console.log("点击查看", index, row);
+      let params = new URLSearchParams();
+      params.append("id", row.id);
+      getStuDetail(params)
+        .then((res) => {
+          //closeDebug console.log("-----------获取学生作业详情---------------");
+          let obj = JSON.parse(res.msg);
+          //closeDebug console.log("个人作业详情", obj);
+          this.detailData = obj;
+        })
+        .catch((failResponse) => {});
+
+      this.ifShowDetail = true;
+    },
+    //返回重选作业
+    goBack() {
+      this.ifShowDetail = false;
+    },
+  },
+};
+</script>
+
+<style>
+.pagination {
+  margin-top: 20px;
+}
+.check-group {
+  margin-bottom: 10px;
+}
+</style>
